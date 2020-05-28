@@ -1,0 +1,17 @@
+/*Checks if current x,y coordinate lies on the edge of a triangle, 
+if so then return a 1, if not then return a 0*/
+module on_triangle();
+
+
+
+
+
+
+
+
+
+
+
+
+
+endmodule

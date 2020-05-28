@@ -1,0 +1,8 @@
+module testbench();
+timeunit 10ns//half clock cycle for 10ns, #1 is one time unit
+time precision 1ns;//round amoutn of time to nearet decimal points
+logic p1,p2,p3;
+
+test_toplevel test(.*);
+
+endmodule

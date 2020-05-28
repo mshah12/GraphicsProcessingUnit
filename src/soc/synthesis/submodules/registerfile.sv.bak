@@ -1,0 +1,96 @@
+module registerfile (
+	// Avalon Clock Input
+	input logic CLK,
+	
+	// Avalon Reset Input
+	input logic RESET,
+	
+	// Avalon-MM Slave Signals
+	input  logic AVL_READ,					// Avalon-MM Read
+	input  logic AVL_WRITE,					// Avalon-MM Write
+	input  logic AVL_CS,						// Avalon-MM Chip Select
+	input  logic AVL_START,
+	input  logic [6:0] AVL_ADDR,			// Avalon-MM Address
+	input  logic [31:0] AVL_WRITEDATA,	// Avalon-MM Write Data
+	output logic [31:0] AVL_READDATA,	// Avalon-MM Read Data
+	
+	// Exported Conduit
+	output logic [31:0] EXPORT_X[12][3],		// Exported Conduit Signal to LEDs
+	output logic [31:0] EXPORT_Y[12][3],
+	output logic [31:0] EXPORT_Z[12][3],
+	output logic [31:0] EXPORT_START,
+	output logic [31:0] EXPORT_SIZE
+);
+
+logic done, donein;
+logic [31:0] regs[128], size, sizein;
+logic [6:0] tracker, trackerin;
+
+enum logic [7:0] {WAIT,S0,S1,S2,S3,S4,DONE} State = WAIT, Next_state;
+
+always_ff @ (posedge CLK)
+begin
+	State <= Next_state;
+	done <= donein;
+	size <= sizein;
+	tracker <= trackerin;
+end
+
+always_comb
+begin
+Next_state = State;
+donein = done;
+sizein = size;
+trackerin = tracker;
+
+unique case(State)
+	
+	WAIT:
+	begin
+	donein = 1'b0;
+	sizein = 32'b00000000000000000000000000000000;
+	trackerin = 7'b0000000;
+	if(AVL_WRITE == 1'b1 && AVL_CS == 1'b1)
+	begin
+	Next_state = S0;
+	end
+	if(AVL_READ == 1'b1 && AVL_CS == 1'b1)
+	begin
+	Next_state = S1;
+	end
+	AVL_READDATA = 32'hXXXXXXXX;
+	Next_state = WAIT;
+	end
+	
+	S0:
+	begin
+	sizein++;
+	regs[AVL_ADDR] = AVL_WRITEDATA;
+	Next_state = S2;
+	end
+	
+	S1:
+	begin
+	AVL_READDATA = regs[AVL_ADDR];
+	Next_state = S2;
+	end
+	
+	S2:
+	begin
+	donein = 1'b1;
+	Next_state = S3;
+	end
+	
+	S3:
+	begin
+	EXPORT_START = done;
+	EXPORT_SIZE = size;
+	end
+	
+	default: ;
+	
+	endcase
+	end
+
+endmodule
+

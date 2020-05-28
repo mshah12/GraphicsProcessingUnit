@@ -1,0 +1,6 @@
+module rasterizeline(input logic [8:0]x1,y1,x2,y2,p1,p2,
+							output logic on_line);
+
+assign on_line = ()
+
+endmodule

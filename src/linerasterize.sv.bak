@@ -1,0 +1,168 @@
+module linerasterize(input logic  [8:0]x0,y0,x1,y1,
+							input logic CLOCK_50,start,proj_fin,readFIFO,
+							output logic is_done,
+							output logic [17:0] outputFIFO, output logic [8:0] fifoSize);
+							
+logic [8:0] minX,maxX,minY,maxY, dx,dy;
+logic [31:0] p,p_in;
+assign dx = maxX - minX;
+assign dy = maxY - minY;
+always_comb
+begin
+if(x0 < x1)
+minX = x0;else
+minX = x1;
+end
+always_comb
+begin
+if(y0 < y1)
+minY = y0;else
+minY = y1;
+end
+
+always_comb
+begin
+if(x0 > x1)
+maxX = x0;else
+maxX = x1;
+end
+always_comb
+begin
+if(y0 > y1)
+maxY = y0;else
+maxY = y1;
+end	
+
+
+enum logic [7:0] {INITIAL,BEGIN,S1,S2,S3,S4,DONE,WAIT1,WAIT2}   State = INITIAL, Next_state; 
+logic [8:0] x,x_in,y,y_in,size,size_in;
+logic [17:0] coordinateData;
+logic writeFIFO,negslope,bigslope,is_done_in;
+assign fifoSize = size;
+
+always_comb
+begin
+if((x0<x1 && y0 > y1) || (x1<x0 && y1>y0))
+negslope = 1'b1;
+else
+negslope = 1'b0;
+end
+always_comb
+begin
+if(dy > dx)
+bigslope = 1'b1;
+else
+bigslope = 1'b0;
+end
+
+
+lineoutput coordinateInfo(
+	.clock(CLOCK_50),
+	.data(coordinateData),
+	.rdreq(readFIFO),
+	.wrreq(writeFIFO),
+	.q(outputFIFO));	
+
+always_ff @ (posedge CLOCK_50)
+	begin
+	State <= Next_state;
+	x<=x_in;
+	y<=y_in;
+	size <= size_in;
+	p=p_in;
+	if(start)
+	is_done <= 1'b0;
+	else
+	is_done <= is_done_in;
+	end
+					
+always_comb
+	begin
+	Next_state = State;
+	is_done_in = is_done;
+	size_in = size;
+	x_in = x;
+	y_in = y;
+	writeFIFO = 1'b0;
+	p_in = p;
+	coordinateData = 18'b0;
+	//negslope_in = negslope;
+	unique case(State)
+	INITIAL: begin
+	if(start)
+	Next_state = BEGIN;
+	else
+	Next_state = INITIAL;
+	end
+	BEGIN: begin
+	if(bigslope)
+	x_in = minY;
+	else
+	x_in = minX;
+	if(negslope)
+	if(bigslope)
+	y_in = maxX;
+	else
+	y_in = maxY;
+	else
+	if(bigslope)
+	y_in = minX;
+	else
+	y_in = minY;
+	size_in = 9'b0;
+	if(bigslope)
+	p_in = (1<<dx) - dy;
+	else
+	p_in = (1<<dy)-dx;
+	Next_state = S1;
+	end
+	S1:begin
+	if(bigslope)begin
+	if(x <= maxY) begin
+	coordinateData = {y,x};
+	writeFIFO = 1'b1;
+	x_in++;
+	size_in++;
+	Next_state = S2; end
+	else
+	Next_state = DONE;
+	end
+	else begin
+	if(x <= maxX) begin
+	coordinateData = {x,y};
+	writeFIFO = 1'b1;
+	x_in++;
+	size_in++;
+	Next_state = S2; end
+	else
+	Next_state = DONE;
+	end
+	end
+	S2: begin
+	if(p[31] == 1 ) begin
+	if(bigslope)
+	p_in = p + (1<<dx);
+	else
+	p_in = p + (1<<dy);
+	Next_state = S1;
+	end else begin
+	if(bigslope)
+	p_in = p + (1<<dx) - (1<<dy);
+	else
+	p_in = p + (1<<dy) - (1<<dx);
+	if(negslope)
+	y_in--;
+	else
+	y_in++;
+	Next_state = S1;
+	end
+	end
+	DONE:begin
+	is_done_in = 1'b1;
+	Next_state = INITIAL;
+	end
+	endcase
+end
+			
+							
+endmodule

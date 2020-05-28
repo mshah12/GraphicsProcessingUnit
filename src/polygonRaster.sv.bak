@@ -1,0 +1,8 @@
+module polygonRaster(output [17:0] coord, input startRaster,
+						output rasterDone, output [8:0] fifoSize));
+
+
+
+
+
+endmodule
